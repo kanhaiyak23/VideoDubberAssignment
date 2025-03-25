@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button, Container, Title, Text, Group, Paper, Tooltip, Box, Stack } from "@mantine/core";
-
+import toast from 'react-hot-toast';
 const tooltipTexts = {
     // FG
     "30": "Dark Gray (33%)",
@@ -27,27 +27,30 @@ export default function Home() {
     const [editorContent, setEditorContent] = useState(
         'Welcome to <span class="ansi-33">Rebane</span>\'s <span class="ansi-45"><span class="ansi-37">Discord</span></span> <span class="ansi-31">C</span><span class="ansi-32">o</span><span class="ansi-33">l</span><span class="ansi-34">o</span><span class="ansi-35">r</span><span class="ansi-36">e</span><span class="ansi-37">d</span> Text Generator!'
     );
+    const [isCopied, setIsCopied] = useState(false);
+    const [copyError, setCopyError] = useState(null);
 
     const applyStyle = (ansiCode) => {
         if (!window.getSelection) return;
         const selection = window.getSelection();
         if (!selection || selection.rangeCount === 0) return;
-
+        const selectedText = selection.toString();
+        const range = selection.getRangeAt(0);
         if (ansiCode === "0") {
-            const text = selection.toString();
-            const range = selection.getRangeAt(0);
+            const textNode = document.createTextNode(selectedText);
             range.deleteContents();
-            range.insertNode(document.createTextNode(text));
+            range.insertNode(textNode);
             return;
         }
+        const styledSpan = document.createElement('span');
+        styledSpan.textContent = selectedText; // Safer than innerText
+        styledSpan.classList.add(`ansi-${ansiCode}`);
 
-        const range = selection.getRangeAt(0);
-        const text = selection.toString();
-        const span = document.createElement("span");
-        span.innerText = text;
-        span.classList.add(`ansi-${ansiCode}`);
+        // Replace selected content with styled element
         range.deleteContents();
-        range.insertNode(span);
+        range.insertNode(styledSpan);
+        // Collapse selection after applying style
+        // selection.removeAllRanges();
     };
 
     const nodesToANSI = (nodes, states = [{ fg: 2, bg: 2, st: 2 }]) => {
@@ -83,23 +86,15 @@ export default function Home() {
         const toCopy = "```ansi\n" + nodesToANSI(editor.childNodes) + "\n```";
         try {
             await navigator.clipboard.writeText(toCopy);
-            //   toast.success("Copied to clipboard!");
+              toast.success("Copied to clipboard!");
+    
         } catch (err) {
-            //   toast.error("Failed to copy text");
+              toast.error("Failed to copy text");
             console.error("Copy failed:", err);
         }
     };
 
 
-    const handleInput = (e) => {
-        const content = e.target.value;
-        const sanitized = content
-            .replace(/<(\/?(br|span|span class="ansi-[0-9]*"))>/g, "[$1]")
-            .replace(/<.*?>/g, "")
-            .replace(/[<>]/g, "")
-            .replace(/\[(\/?(br|span|span class="ansi-[0-9]*"))\]/g, "<$1>");
-        setEditorContent(sanitized);
-    };
 
     return (
         <Container className="min-h-screen bg-[#36393F] text-white p-8">
@@ -146,15 +141,15 @@ export default function Home() {
                         <Group>
                             <Text className="mr-4 font-semibold">FG</Text>
                             {[30, 31, 32, 33, 34, 35, 36, 37].map((code) => (
-                                <Box key={code} className="relative inline-block">
+                                <Box key={code} className="relative inline-block group">
                                     <Button
                                         variant="outline"
                                         className={`w-8 h-8 p-0 mx-1 ansi-${code}-bg`}
                                         onClick={() => applyStyle(code.toString())}
                                     />
-                                    {/* <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 opacity-0 bg-gray-700 text-white text-xs px-2 py-1 rounded transition-opacity group-hover:opacity-100">
-                                    {tooltipTexts[code]}
-                                        </div> */}
+                                    <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 opacity-0 bg-gray-700 text-white text-xs px-2 py-1 rounded transition-opacity group-hover:opacity-100">
+                                        {tooltipTexts[code]}
+                                    </div>
                                 </Box>
                             ))}
                         </Group>
@@ -169,14 +164,14 @@ export default function Home() {
                                         className={`w-8 h-8 p-0 mx-1 ansi-${code}`}
                                         onClick={() => applyStyle(code.toString())}
                                     />
-                                    {/* <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 opacity-0 bg-gray-700 text-white text-xs px-2 py-1 rounded transition-opacity group-hover:opacity-100">
-                    {tooltipTexts[code]}
-                  </div> */}
+                                    <div className="absolute bottom-10 left-1/2 transform -translate-x-1/2 opacity-0 bg-gray-700 text-white text-xs px-2 py-1 rounded transition-opacity group-hover:opacity-100">
+                                        {tooltipTexts[code]}
+                                    </div>
                                 </Box>
                             ))}
                         </div>
                     </div>
-                            {/* Mantine’s <Textarea> does not support rich text formatting (color changes, bold, etc.) so i use contentEditable div */}
+                    {/* Mantine’s <Textarea> does not support rich text formatting (color changes, bold, etc.) so i use contentEditable div */}
                     <div
                         id="editor"
                         contentEditable
@@ -201,13 +196,16 @@ export default function Home() {
                         }}
                     />
 
-                    <Button size="lg" className="bg-[#5865F2] hover:bg-[#4752C4] text-white" onClick={copyText}>
-                        Copy text as Discord formatted
+                    <Button
+                        size="lg"
+                        className={`bg-[#5865F2] hover:bg-[#4752C4] text-white transition-colors p-4 ${isCopied ? 'bg-green-600 hover:bg-green-700 p-4'  : ''}`}
+                        onClick={copyText}
+                    >
+                        {/* {isCopied ? 'Copied!' : 'Copy text as Discord formatted'} */}
+                          'Copy text as Discord formatted'
                     </Button>
                 </Paper>
-                <Text className="text-sm text-gray-400 mt-8">
-                    This is an unofficial tool, it is not made or endorsed by Discord.
-                </Text>
+                
             </Paper>
         </Container>
     );
